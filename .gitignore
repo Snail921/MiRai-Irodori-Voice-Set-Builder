@@ -1,0 +1,29 @@
+# Local Python environments and caches
+/.venv/
+/.uv-cache/
+/__pycache__/
+**/__pycache__/
+/.pytest_cache/
+/.mypy_cache/
+*.py[cod]
+
+# Generated audio and recoverable edit/delete backups
+/output/
+*.wav.part
+
+# User-specific Builder state
+/settings.json
+/settings.json.tmp
+
+# Local development artifacts
+/.codex_staging/
+*.log
+.coverage
+htmlcov/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/

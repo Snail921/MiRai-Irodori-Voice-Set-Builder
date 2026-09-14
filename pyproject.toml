@@ -1,0 +1,12 @@
+[project]
+name = "irodori-voice-set-builder"
+version = "0.1.0"
+description = "A standalone Gradio voice-set builder for the Irodori-TTS HTTP server"
+requires-python = ">=3.10"
+dependencies = [
+    "gradio>=5.0,<7",
+    "requests>=2.31,<3",
+]
+
+[tool.uv]
+package = false
