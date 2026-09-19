@@ -9,7 +9,10 @@ from unittest.mock import patch
 from app import (
     ARRANGE_JS,
     ARRANGE_REFRESH_START_JS,
+    GENERATION_CSS,
+    GENERATION_FINISH_JS,
     GENERATION_START_JS,
+    OPEN_ARRANGE_TAB_JS,
     run_type_generation,
     select_generated_voice,
     render_arrange_board,
@@ -90,6 +93,15 @@ class ArrangeSelectionTests(unittest.TestCase):
     def test_generation_start_js_preserves_backend_inputs(self) -> None:
         self.assertIn("(...inputs)", GENERATION_START_JS)
         self.assertIn("return inputs", GENERATION_START_JS)
+
+    def test_generation_shortcuts_share_state_and_open_arrange_tab(self) -> None:
+        self.assertIn("querySelectorAll", GENERATION_START_JS)
+        self.assertIn("querySelectorAll", GENERATION_FINISH_JS)
+        self.assertIn("button.disabled = !succeeded", GENERATION_FINISH_JS)
+        self.assertIn("#arrange-tab-rail", GENERATION_CSS)
+        self.assertIn("position: fixed", GENERATION_CSS)
+        self.assertIn("writing-mode: vertical-rl", GENERATION_CSS)
+        self.assertIn("=== 'Arrange'", OPEN_ARRANGE_TAB_JS)
 
     def test_prefix_change_is_captured_before_a_card_can_be_replaced(self) -> None:
         self.assertIn("addEventListener('input'", ARRANGE_JS)

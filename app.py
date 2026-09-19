@@ -61,7 +61,8 @@ GENERATION_CSS = """
   color: #000 !important;
   font-weight: 700 !important;
 }
-.arrange-tab-shortcut {
+.arrange-tab-shortcut,
+.arrange-tab-shortcut button {
   min-width: 190px !important;
   min-height: 44px !important;
   padding: 9px 18px !important;
@@ -69,17 +70,56 @@ GENERATION_CSS = """
   font-weight: 700 !important;
 }
 .arrange-tab-shortcut.shortcut-running,
-.arrange-tab-shortcut:disabled {
+.arrange-tab-shortcut.shortcut-running button,
+.arrange-tab-shortcut:disabled,
+.arrange-tab-shortcut button:disabled {
   color: #fff !important;
   background: #9ca3af !important;
   border-color: #9ca3af !important;
   cursor: wait !important;
   opacity: .8 !important;
 }
-.arrange-tab-shortcut.shortcut-ready {
+.arrange-tab-shortcut.shortcut-ready,
+.arrange-tab-shortcut.shortcut-ready button {
   color: #fff !important;
   background: #15803d !important;
   border-color: #15803d !important;
+}
+#arrange-tab-rail {
+  position: fixed !important;
+  z-index: 90;
+  top: 19vh;
+  right: 20px;
+  bottom: 4vh;
+  width: 54px !important;
+  min-width: 54px !important;
+  max-width: 54px !important;
+  min-height: 300px !important;
+  margin: 0 !important;
+}
+#arrange-tab-rail > button {
+  width: 100% !important;
+  min-width: 54px !important;
+  height: 100% !important;
+  min-height: 300px !important;
+  padding: 18px 10px !important;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  letter-spacing: .12em;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+}
+button#arrange-tab-rail {
+  height: auto !important;
+  padding: 18px 10px !important;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  letter-spacing: .12em;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+}
+@media (max-width: 1500px), (max-height: 650px) {
+  #arrange-tab-rail { display: none !important; }
 }
 .type-generate {
   color: #fff !important;
@@ -850,21 +890,36 @@ window.__irodoriPrefixSelectObserver.observe(document.body, {childList: true, su
 """
 
 GENERATION_START_JS = """(...inputs) => {
-  const button = document.querySelector('button.arrange-tab-shortcut');
-  if (button) {
+  const buttons = Array.from(new Set(document.querySelectorAll(
+    'button.arrange-tab-shortcut, .arrange-tab-shortcut button'
+  )));
+  buttons.forEach((button) => {
+    if (!button.dataset.idleLabel) button.dataset.idleLabel = button.textContent.trim();
+    button.textContent = '生成中…';
     button.disabled = true;
     button.classList.remove('shortcut-ready');
     button.classList.add('shortcut-running');
-  }
+  });
   return inputs;
 }"""
 
 GENERATION_FINISH_JS = """(status) => {
-  const button = document.querySelector('button.arrange-tab-shortcut');
-  if (!button) return;
-  button.disabled = false;
-  button.classList.remove('shortcut-running');
-  button.classList.toggle('shortcut-ready', String(status || '').trim().startsWith('✅'));
+  const succeeded = String(status || '').trim().startsWith('✅');
+  const buttons = Array.from(new Set(document.querySelectorAll(
+    'button.arrange-tab-shortcut, .arrange-tab-shortcut button'
+  )));
+  buttons.forEach((button) => {
+    button.textContent = button.dataset.idleLabel || button.textContent;
+    button.disabled = !succeeded;
+    button.classList.remove('shortcut-running');
+    button.classList.toggle('shortcut-ready', succeeded);
+  });
+}"""
+
+OPEN_ARRANGE_TAB_JS = """() => {
+  const target = Array.from(document.querySelectorAll('button[role="tab"]'))
+    .find((button) => button.textContent.trim() === 'Arrange');
+  if (target) target.click();
 }"""
 
 ARRANGE_REFRESH_START_JS = """(...inputs) => {
@@ -1414,6 +1469,12 @@ def build_ui() -> gr.Blocks:
             "起動済みのIrodori-TTSサーバーを利用して、タイプ別のボイスセットを生成します。"
         )
         with gr.Tab("Generation"):
+            arrange_rail_shortcut = gr.Button(
+                "Arrange画面へ",
+                elem_id="arrange-tab-rail",
+                elem_classes="arrange-tab-shortcut",
+                interactive=False,
+            )
             with gr.Row():
                 server_url = gr.Textbox(
                     label="TTSサーバーURL",
@@ -1517,6 +1578,7 @@ def build_ui() -> gr.Blocks:
                     scale=0,
                     min_width=190,
                     elem_classes="arrange-tab-shortcut",
+                    interactive=False,
                 )
             generation_status = gr.Markdown()
             generation_log = gr.Textbox(label="生成ログ", lines=10, interactive=False)
@@ -1538,11 +1600,11 @@ def build_ui() -> gr.Blocks:
             )
             arrange_shortcut.click(
                 fn=None,
-                js="""() => {
-                  const target = Array.from(document.querySelectorAll('button[role="tab"]'))
-                    .find((button) => button.textContent.trim() === 'Arrange');
-                  if (target) target.click();
-                }""",
+                js=OPEN_ARRANGE_TAB_JS,
+            )
+            arrange_rail_shortcut.click(
+                fn=None,
+                js=OPEN_ARRANGE_TAB_JS,
             )
             for voice_type, type_button, sample_button, row_inputs, sample_state in type_buttons:
                 type_generation_event = type_button.click(

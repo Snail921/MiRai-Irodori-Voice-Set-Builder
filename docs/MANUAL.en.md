@@ -63,7 +63,7 @@ For example, `Good morning/Hello` with an output count of `3` produces six clips
 
 Click the orange **Generate** button at the bottom and approve the confirmation dialog. Enabled types are processed sequentially from top to bottom. Do not close the server or Builder during generation.
 
-After successful completion, the generation log and file list are shown, the Arrange shortcut is enabled, and the Arrange tab automatically selects the generated voice set.
+After successful completion, the bottom **Arrangeタブへ** button and the tall **Arrange画面へ** button at the right edge turn green and become available. They remain disabled while generation is running or after a failed run. Either shortcut opens the Arrange tab with the generated voice set selected. The right-edge shortcut is hidden on narrow windows to avoid covering the controls; the bottom shortcut remains available.
 
 ### 4.5 Output layout and filenames
 
