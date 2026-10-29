@@ -56,6 +56,82 @@ SAMPLE_DIRECTORY = Path(SAMPLE_TEMP_DIRECTORY.name).resolve()
 SETTINGS_PATH = APP_DIRECTORY / "settings.json"
 SETTINGS_LOCK = threading.Lock()
 
+# One palette is shared by Generation rows and Arrange columns.
+STATE_COLORS = {
+    "Default": "#52657d",
+    "LowArousal": "#14827d",
+    "MediumArousal": "#356bb3",
+    "HighArousal": "#7055b4",
+    "NearOrgasm": "#a34c94",
+    "Orgasm": "#b5465a",
+    "Hypersensitive": "#c66b2f",
+    "Overdrive": "#8b6930",
+    "DeepOrgasm": "#5f6e32",
+}
+
+# Supported text controls from Aratako/Irodori-TTS-500M EMOJI_ANNOTATIONS.md.
+EMOJI_ANNOTATIONS = (
+    ("👂", "囁き、耳元の音"),
+    ("😮‍💨", "吐息、溜息、寝息"),
+    ("⏸️", "間、沈黙"),
+    ("🤭", "笑い（くすくす、含み笑いなど）"),
+    ("🥵", "喘ぎ、うめき声、唸り声"),
+    ("📢", "エコー、リバーブ"),
+    ("😏", "からかうように、甘えるように"),
+    ("🥺", "声を震わせながら、自信のなさげに"),
+    ("🌬️", "息切れ、荒い息遣い、呼吸音"),
+    ("😮", "息をのむ"),
+    ("👅", "舐める音、咀嚼音、水音"),
+    ("💋", "リップノイズ"),
+    ("🫶", "優しく"),
+    ("😭", "嗚咽、泣き声、悲しみ"),
+    ("😱", "悲鳴、叫び、絶叫"),
+    ("😪", "眠そうに、気だるげに"),
+    ("⏩", "早口、一気にまくしたてる、急いで"),
+    ("📞", "電話越し、スピーカー越しのような音"),
+    ("🐢", "ゆっくりと"),
+    ("🥤", "唾を飲み込む音"),
+    ("🤧", "咳き込み、鼻をすする、くしゃみ、咳払い"),
+    ("😒", "舌打ち"),
+    ("😰", "慌てて、動揺、緊張、どもり"),
+    ("😆", "喜びながら"),
+    ("😠", "怒り、不満げに、拗ねながら"),
+    ("😲", "驚き、感嘆"),
+    ("🥱", "あくび"),
+    ("😖", "苦しげに"),
+    ("😟", "心配そうに"),
+    ("🫣", "恥ずかしそうに、照れながら"),
+    ("🙄", "呆れたように"),
+    ("😊", "楽しげに、嬉しそうに"),
+    ("👌", "相槌、頷く音"),
+    ("🙏", "懇願するように"),
+    ("🥴", "酔っ払って"),
+    ("🎵", "鼻歌"),
+    ("🤐", "口を塞がれて"),
+    ("😌", "安堵、満足げに"),
+    ("🤔", "疑問の声"),
+)
+
+# Decomposed kana + U+3099 combinations found in the referenced writing sample.
+# Apparent artifacts (dakuten on punctuation/hearts and doubled dakuten) are excluded.
+SPECIAL_CHARACTER_ANNOTATIONS = tuple(
+    (character, f"結合濁点付き「{character[0]}」")
+    for character in (
+        "ぁ゙", "ぉ゙", "お゙", "ん゙", "あ゙", "ぃ゙", "ぇ゙", "ぅ゙", "っ゙", "ゃ゙",
+        "ら゙", "る゙", "め゙", "な゙", "よ゙", "も゙", "い゙", "や゙", "を゙", "ゔ",
+    )
+)
+
+
+def state_class(voice_type: str) -> str:
+    return f"state-{voice_type.lower()}"
+
+
+STATE_PALETTE_CSS = "\n".join(
+    f".{state_class(voice_type)} {{ --state-color: {color}; }}"
+    for voice_type, color in STATE_COLORS.items()
+)
+
 GENERATION_CSS = """
 .generation-type-text label > span {
   color: #000 !important;
@@ -85,7 +161,7 @@ GENERATION_CSS = """
   background: #15803d !important;
   border-color: #15803d !important;
 }
-#arrange-tab-rail {
+:is(#arrange-tab-rail, #generate-tab-rail) {
   position: fixed !important;
   z-index: 90;
   top: 19vh;
@@ -97,7 +173,7 @@ GENERATION_CSS = """
   min-height: 300px !important;
   margin: 0 !important;
 }
-#arrange-tab-rail > button {
+:is(#arrange-tab-rail, #generate-tab-rail) > button {
   width: 100% !important;
   min-width: 54px !important;
   height: 100% !important;
@@ -109,7 +185,7 @@ GENERATION_CSS = """
   border-radius: 12px !important;
   box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
 }
-button#arrange-tab-rail {
+:is(button#arrange-tab-rail, button#generate-tab-rail) {
   height: auto !important;
   padding: 18px 10px !important;
   writing-mode: vertical-rl;
@@ -118,15 +194,89 @@ button#arrange-tab-rail {
   border-radius: 12px !important;
   box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
 }
+#generate-tab-rail, #generate-tab-rail > button {
+  color: #fff !important;
+  background: #c6581b !important;
+  border-color: #a84414 !important;
+}
 @media (max-width: 1500px), (max-height: 650px) {
-  #arrange-tab-rail { display: none !important; }
+  :is(#arrange-tab-rail, #generate-tab-rail) { display: none !important; }
+}
+.generation-state-row {
+  --state-color: #52657d;
+  flex-wrap: wrap !important;
+  border: 2px solid var(--state-color) !important;
+  border-radius: 10px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--state-color) 7%, var(--background-fill-primary));
+}
+.generation-state-row .generation-type-text label > span {
+  color: var(--state-color) !important;
+}
+.generation-text-column { min-width: 0 !important; }
+.emoji-palette-host {
+  flex: 1 0 100% !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  margin-top: -3px;
+}
+.emoji-palette {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  width: 100%;
+  padding: 4px 1px 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+.special-character-palette {
+  padding-top: 2px;
+  border-top: 1px solid color-mix(in srgb, var(--state-color) 25%, transparent);
+}
+.text-insert-button {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  flex: 0 0 30px;
+  padding: 0 !important;
+  border: 1px solid color-mix(in srgb, var(--state-color) 55%, var(--border-color-primary));
+  border-radius: 5px;
+  cursor: pointer;
+  background: var(--button-secondary-background-fill);
+  color: var(--button-secondary-text-color);
+  font-size: 17px;
+  line-height: 1;
+}
+.text-insert-button:hover,
+.text-insert-button:focus-visible {
+  border-color: var(--state-color);
+  background: color-mix(in srgb, var(--state-color) 14%, var(--button-secondary-background-fill));
+  outline: 2px solid color-mix(in srgb, var(--state-color) 45%, transparent);
+}
+#irodori-emoji-tooltip {
+  position: fixed;
+  z-index: 10000;
+  display: none;
+  max-width: 360px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  pointer-events: none;
+  color: #fff;
+  background: rgba(17, 24, 39, .96);
+  box-shadow: 0 5px 18px rgba(0, 0, 0, .28);
+  font-size: 13px;
+  line-height: 1.35;
+  white-space: normal;
 }
 .type-generate {
   color: #fff !important;
   background: #15803d !important;
   border-color: #15803d !important;
 }
-"""
+""" + STATE_PALETTE_CSS
 
 ARRANGE_CSS = """
 .arrange-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(255px, 1fr)); gap: 12px; align-items: start; }
@@ -138,9 +288,9 @@ ARRANGE_CSS = """
 .arrange-delete-all { padding: 7px 12px; font-weight: 600; }
 .arrange-type-delete { padding: 2px 6px; font-size: 11px; }
 .arrange-type-delete:disabled { cursor: default; opacity: .4; }
-.arrange-type { min-height: 150px; border: 2px dashed var(--border-color-primary); border-radius: 10px; padding: 9px; background: var(--background-fill-secondary); transition: border-color .15s, background .15s; }
-.arrange-type.drag-over { border-color: var(--color-accent); background: var(--background-fill-primary); }
-.arrange-type-title { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-weight: 700; }
+.arrange-type { --state-color: #52657d; min-height: 150px; border: 2px solid var(--state-color); border-radius: 10px; padding: 9px; background: color-mix(in srgb, var(--state-color) 8%, var(--background-fill-secondary)); transition: border-color .15s, background .15s; }
+.arrange-type.drag-over { border-color: var(--state-color); background: color-mix(in srgb, var(--state-color) 20%, var(--background-fill-primary)); box-shadow: 0 0 0 3px var(--state-color); }
+.arrange-type-title { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; padding-bottom: 5px; border-bottom: 2px solid var(--state-color); font-weight: 700; }
 .arrange-count { opacity: .7; font-size: .85em; }
 .arrange-empty { opacity: .55; padding: 24px 6px; text-align: center; }
 .clip-card { margin: 7px 0; padding: 7px; border: 1px solid var(--border-color-primary); border-radius: 8px; background: var(--block-background-fill); box-shadow: var(--block-shadow); }
@@ -207,7 +357,7 @@ ARRANGE_CSS = """
 .trim-preview { background: var(--button-secondary-background-fill); color: var(--button-secondary-text-color); }
 .trim-cancel { background: var(--button-secondary-background-fill); color: var(--button-secondary-text-color); }
 .trim-apply { background: #15803d; color: #fff; }
-"""
+""" + STATE_PALETTE_CSS
 
 ARRANGE_JS = """
 let dragged = null;
@@ -922,6 +1072,108 @@ OPEN_ARRANGE_TAB_JS = """() => {
   if (target) target.click();
 }"""
 
+OPEN_GENERATION_TAB_JS = """() => {
+  const target = Array.from(document.querySelectorAll('button[role="tab"]'))
+    .find((button) => button.textContent.trim() === 'Generation');
+  if (target) target.click();
+}"""
+
+EMOJI_PALETTE_JS = """
+  let initializationAttempts = 0;
+  const initializeEmojiPalette = () => {
+  const row = element.closest('.generation-state-row');
+  const textarea = row && row.querySelector('.generation-type-text textarea');
+  if (!textarea) {
+    initializationAttempts += 1;
+    if (initializationAttempts < 60) window.requestAnimationFrame(initializeEmojiPalette);
+    return;
+  }
+  if (element.dataset.emojiPaletteReady !== '1') {
+    element.dataset.emojiPaletteReady = '1';
+
+  const rememberCursor = () => {
+    textarea.dataset.emojiCursorStart = String(textarea.selectionStart);
+    textarea.dataset.emojiCursorEnd = String(textarea.selectionEnd);
+  };
+  ['focus', 'click', 'keyup', 'select', 'input'].forEach((name) => {
+    textarea.addEventListener(name, rememberCursor);
+  });
+
+  let tooltip = document.querySelector('#irodori-emoji-tooltip');
+  if (!tooltip) {
+    tooltip = document.createElement('div');
+    tooltip.id = 'irodori-emoji-tooltip';
+    tooltip.setAttribute('role', 'tooltip');
+    document.body.appendChild(tooltip);
+  }
+  const showTooltip = (button) => {
+    tooltip.textContent = button.dataset.tooltip || '';
+    tooltip.style.display = 'block';
+    const buttonRect = button.getBoundingClientRect();
+    const tipRect = tooltip.getBoundingClientRect();
+    const left = Math.max(8, Math.min(
+      window.innerWidth - tipRect.width - 8,
+      buttonRect.left + buttonRect.width / 2 - tipRect.width / 2
+    ));
+    const above = buttonRect.top - tipRect.height - 8;
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${above >= 8 ? above : buttonRect.bottom + 8}px`;
+  };
+  const hideTooltip = () => { tooltip.style.display = 'none'; };
+
+    element.querySelectorAll('.text-insert-button').forEach((button) => {
+    button.addEventListener('mousedown', (event) => event.preventDefault());
+    button.addEventListener('mouseenter', () => showTooltip(button));
+    button.addEventListener('mouseleave', hideTooltip);
+    button.addEventListener('focus', () => showTooltip(button));
+    button.addEventListener('blur', hideTooltip);
+    button.addEventListener('click', () => {
+      const insertedText = button.dataset.insert || button.dataset.emoji || '';
+      const hasCursor = textarea.dataset.emojiCursorStart !== undefined;
+      const fallback = textarea.value.length;
+      const start = hasCursor ? Number(textarea.dataset.emojiCursorStart) : fallback;
+      const end = hasCursor ? Number(textarea.dataset.emojiCursorEnd) : fallback;
+      textarea.setRangeText(insertedText, start, end, 'end');
+      textarea.dispatchEvent(new InputEvent('input', {
+        bubbles: true,
+        composed: true,
+        inputType: 'insertText',
+        data: insertedText,
+      }));
+      textarea.focus();
+      rememberCursor();
+      hideTooltip();
+    });
+    });
+  }
+  };
+  window.requestAnimationFrame(initializeEmojiPalette);
+"""
+
+
+def emoji_palette_html() -> str:
+    buttons = "".join(
+        '<button type="button" class="text-insert-button emoji-palette-button" '
+        f'data-emoji="{escape(emoji, quote=True)}" '
+        f'data-tooltip="{escape(description, quote=True)}" '
+        f'aria-label="{escape(emoji + "：" + description, quote=True)}">'
+        f'{escape(emoji)}</button>'
+        for emoji, description in EMOJI_ANNOTATIONS
+    )
+    special_buttons = "".join(
+        '<button type="button" class="text-insert-button special-character-button" '
+        f'data-insert="{escape(character, quote=True)}" '
+        f'data-tooltip="{escape(description, quote=True)}" '
+        f'aria-label="{escape(character + "：" + description, quote=True)}">'
+        f'{escape(character)}</button>'
+        for character, description in SPECIAL_CHARACTER_ANNOTATIONS
+    )
+    return (
+        f'<div class="emoji-palette" aria-label="TTS絵文字一覧">{buttons}</div>'
+        f'<div class="emoji-palette special-character-palette" '
+        f'aria-label="特殊文字一覧">{special_buttons}</div>'
+    )
+
 ARRANGE_REFRESH_START_JS = """(...inputs) => {
   const board = document.querySelector('#arrange-board-component');
   if (board) {
@@ -1244,7 +1496,7 @@ def render_arrange_board(voice_set: str | None) -> str:
     for voice_type in VOICE_TYPES:
         clips = clips_by_type[voice_type]
         columns.append(
-            f'<section class="arrange-type" data-type="{escape(voice_type, quote=True)}">'
+            f'<section class="arrange-type {state_class(voice_type)}" data-type="{escape(voice_type, quote=True)}">'
             f'<div class="arrange-type-title"><span>{escape(voice_type)}</span>'
             f'<span class="arrange-count">{len(clips)} clips</span>'
             f'<button class="arrange-type-delete" data-type="{escape(voice_type, quote=True)}"'
@@ -1506,21 +1758,21 @@ def build_ui() -> gr.Blocks:
             ] = []
             for voice_type in VOICE_TYPES:
                 type_saved = saved["types"][voice_type]
-                with gr.Row():
+                with gr.Row(elem_classes=["generation-state-row", state_class(voice_type)]):
                     enabled_input = gr.Checkbox(
                         label="有効",
                         value=type_saved["enabled"],
                         scale=0,
                         min_width=55,
                     )
-                    text_input = gr.Textbox(
-                        label=voice_type,
-                        placeholder="/ で複数指定（例: こんにちは/おはよう）",
-                        value=type_saved["text"],
-                        lines=2,
-                        scale=4,
-                        elem_classes="generation-type-text",
-                    )
+                    with gr.Column(scale=4, elem_classes="generation-text-column"):
+                        text_input = gr.Textbox(
+                            label=voice_type,
+                            placeholder="/ で複数指定（例: こんにちは/おはよう）",
+                            value=type_saved["text"],
+                            lines=2,
+                            elem_classes="generation-type-text",
+                        )
                     caption_input = gr.Textbox(
                         label=f"{voice_type} Caption（任意）",
                         placeholder="このタイプの声質・スタイル指定",
@@ -1544,6 +1796,12 @@ def build_ui() -> gr.Blocks:
                             elem_classes="type-generate",
                         )
                     sample_state = gr.State({"index": 0, "path": ""})
+                    gr.HTML(
+                        value=emoji_palette_html(),
+                        container=False,
+                        elem_classes="emoji-palette-host",
+                        js_on_load=EMOJI_PALETTE_JS,
+                    )
                 row_inputs = [text_input, caption_input, count_input]
                 inputs.extend((enabled_input, *row_inputs))
                 type_buttons.append(
@@ -1643,6 +1901,12 @@ def build_ui() -> gr.Blocks:
             gr.Markdown("入力内容と各タイプの有効状態は自動保存され、次回起動時に復元されます。")
 
         with gr.Tab("Arrange") as arrange_tab:
+            generate_rail_shortcut = gr.Button(
+                "Generate画面へ",
+                elem_id="generate-tab-rail",
+                elem_classes="generate-tab-shortcut",
+            )
+            generate_rail_shortcut.click(fn=None, js=OPEN_GENERATION_TAB_JS)
             initial_voice_sets = list(list_voice_sets(OUTPUT_DIRECTORY))
             initial_voice = initial_voice_sets[0] if initial_voice_sets else None
             with gr.Row():

@@ -37,6 +37,12 @@ If the browser does not open, visit the displayed URL manually. Closing the comm
 
 ![Generation tab](images/generation.png)
 
+Each state row has its own colored outline. The matching Arrange column uses the same color so you can follow a state across both screens.
+
+The lower section of each state row uses the full row width for a single-line palette of the emojis supported by Irodori-TTS. Hover over a button to see the meaning, emotion, or style it represents. Clicking inserts the emoji at the text cursor; if the field has not received a cursor yet, it is appended to existing text (or inserted at the start of an empty field). If the palette still exceeds the full row width, scroll it horizontally. Inserting the same emoji more than once can emphasize its effect.
+
+Directly below the emoji row is a special-character row containing kana combined with U+3099, such as “お゙” and “ん゙”. These buttons use the same insertion behavior as the emoji buttons, inserting at the text cursor or appending when no cursor has been established.
+
 ### 4.1 Connect to the server
 
 Enter the endpoint in **TTSサーバーURL** (TTS server URL), then click **接続確認** (Check connection). A successful check shows the number of voices and whether the runtime is loaded.
@@ -76,6 +82,8 @@ If a filename already exists, the Builder chooses the next available number such
 ## 5. Arrange tab
 
 ![Arrange tab](images/arrange.png)
+
+Each state column uses the same colored outline and heading accent as its Generation row. The tall **Generate画面へ** button at the right edge stays in view while scrolling and returns to the Generation tab. On narrow windows it is hidden to avoid covering controls; use the Generation tab at the top instead.
 
 ### 5.1 Display a voice set
 

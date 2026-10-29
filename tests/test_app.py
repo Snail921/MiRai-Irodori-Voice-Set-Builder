@@ -7,12 +7,20 @@ from pathlib import Path
 from unittest.mock import patch
 
 from app import (
+    ARRANGE_CSS,
     ARRANGE_JS,
     ARRANGE_REFRESH_START_JS,
     GENERATION_CSS,
     GENERATION_FINISH_JS,
     GENERATION_START_JS,
+    EMOJI_ANNOTATIONS,
+    EMOJI_PALETTE_JS,
+    SPECIAL_CHARACTER_ANNOTATIONS,
     OPEN_ARRANGE_TAB_JS,
+    OPEN_GENERATION_TAB_JS,
+    STATE_COLORS,
+    emoji_palette_html,
+    state_class,
     run_type_generation,
     select_generated_voice,
     render_arrange_board,
@@ -86,6 +94,7 @@ class ArrangeSelectionTests(unittest.TestCase):
             self.assertIn("hello_000.wav", board)
             self.assertIn('<span class="clip-name">hello_000.wav</span>', board)
             self.assertIn('prefix-continue', board)
+            self.assertIn('class="arrange-type state-default"', board)
             self.assertIn('value="Continue" selected', board)
             self.assertIn('class="trim-prefix"', board)
             self.assertIn("1クリップ", status)
@@ -102,6 +111,53 @@ class ArrangeSelectionTests(unittest.TestCase):
         self.assertIn("position: fixed", GENERATION_CSS)
         self.assertIn("writing-mode: vertical-rl", GENERATION_CSS)
         self.assertIn("=== 'Arrange'", OPEN_ARRANGE_TAB_JS)
+
+    def test_state_palette_is_shared_across_generation_and_arrange(self) -> None:
+        from irodori_builder import VOICE_TYPES
+
+        self.assertEqual(set(STATE_COLORS), set(VOICE_TYPES))
+        self.assertEqual(len(set(STATE_COLORS.values())), len(VOICE_TYPES))
+        for voice_type, color in STATE_COLORS.items():
+            with self.subTest(voice_type=voice_type):
+                declaration = f".{state_class(voice_type)} {{ --state-color: {color}; }}"
+                self.assertIn(declaration, GENERATION_CSS)
+                self.assertIn(declaration, ARRANGE_CSS)
+
+    def test_arrange_has_fixed_generate_shortcut(self) -> None:
+        self.assertIn("#generate-tab-rail", GENERATION_CSS)
+        self.assertIn("position: fixed", GENERATION_CSS)
+        self.assertIn("=== 'Generation'", OPEN_GENERATION_TAB_JS)
+
+    def test_generation_emoji_palette_contains_all_supported_controls(self) -> None:
+        palette = emoji_palette_html()
+
+        self.assertEqual(len(EMOJI_ANNOTATIONS), 39)
+        self.assertEqual(palette.count('emoji-palette-button"'), len(EMOJI_ANNOTATIONS))
+        self.assertIn('data-emoji="👂"', palette)
+        self.assertIn('data-tooltip="囁き、耳元の音"', palette)
+        self.assertIn('aria-label="🤔：疑問の声"', palette)
+        self.assertIn(".emoji-palette-host", GENERATION_CSS)
+        self.assertIn("flex: 1 0 100%", GENERATION_CSS)
+
+    def test_special_character_palette_is_below_emoji_palette(self) -> None:
+        palette = emoji_palette_html()
+
+        self.assertEqual(len(SPECIAL_CHARACTER_ANNOTATIONS), 20)
+        self.assertEqual(palette.count('special-character-button"'), 20)
+        self.assertLess(palette.index('aria-label="TTS絵文字一覧"'), palette.index('aria-label="特殊文字一覧"'))
+        self.assertIn('data-insert="お゙"', palette)
+        self.assertIn('data-tooltip="結合濁点付き「お」"', palette)
+        self.assertNotIn('data-insert="♡゙"', palette)
+
+    def test_emoji_insertion_tracks_cursor_and_falls_back_to_text_end(self) -> None:
+        self.assertIn("textarea.selectionStart", EMOJI_PALETTE_JS)
+        self.assertIn("textarea.value.length", EMOJI_PALETTE_JS)
+        self.assertIn("textarea.setRangeText", EMOJI_PALETTE_JS)
+        self.assertIn("button.dataset.insert", EMOJI_PALETTE_JS)
+        self.assertIn("textarea.focus()", EMOJI_PALETTE_JS)
+        self.assertIn("new InputEvent('input'", EMOJI_PALETTE_JS)
+        self.assertIn("#irodori-emoji-tooltip", EMOJI_PALETTE_JS)
+        self.assertIn("requestAnimationFrame(initializeEmojiPalette)", EMOJI_PALETTE_JS)
 
     def test_prefix_change_is_captured_before_a_card_can_be_replaced(self) -> None:
         self.assertIn("addEventListener('input'", ARRANGE_JS)
