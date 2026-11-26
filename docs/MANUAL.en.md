@@ -49,7 +49,7 @@ Enter the endpoint in **TTSサーバーURL** (TTS server URL), then click **接�
 
 ### 4.2 Shared fields
 
-- **参照voice** (Reference voice): Enter an ID registered under the TTS server's `voices` directory. Matching is case-insensitive.
+- **参照voice** (Reference voice): Choose a voice from the connected TTS server in the dropdown. On startup, the Builder loads the list from the saved URL and restores the last selection if it is still available.
 - **ステップ数** (Steps): Enter an integer from `1` through `120`. The default is `40`.
 
 The Builder detects an unknown reference voice before generation. It also stops if the TTS server falls back to no-reference inference.
@@ -144,7 +144,7 @@ Install uv, then reopen Explorer or the command prompt. Verify the installation 
 
 ### The reference voice cannot be found
 
-Open `http://127.0.0.1:5000/voices` and copy the displayed `id` into the reference voice field.
+Check the voice registration in the TTS server's `voices` directory, then click **接続確認** (Check connection) to refresh the list.
 
 ### Port 7860 is already in use
 

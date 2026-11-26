@@ -35,7 +35,7 @@ The Whisper server is not used.
 2. Download or clone this repository.
 3. Double-click `Start_IrodoriVoiceSetBuilder.bat`.
 4. In the automatically opened `http://127.0.0.1:7860` page, click **接続確認** (Check connection).
-5. Enter a reference voice, text, and output count, then click **Generate**.
+5. Select a reference voice from the dropdown, enter the text and output count, then click **Generate**.
 
 On the first launch, uv creates a dedicated virtual environment and installs the dependencies recorded in the lock file. To stop the Builder, press `Ctrl+C` in its command window.
 

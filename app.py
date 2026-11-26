@@ -1192,16 +1192,26 @@ ARRANGE_REFRESH_FINISH_JS = """() => {
 }"""
 
 
-def check_server(server_url: str) -> str:
+def check_server(server_url: str, voice_id: str | None) -> tuple[str, gr.Dropdown]:
     try:
         client = IrodoriServerClient(server_url)
         health = client.health()
-        voices = client._get_json("/voices").get("voices", [])
-        voice_count = len(voices) if isinstance(voices, list) else health.get("voices", "?")
+        voices = client.list_voice_ids()
+        if voice_id is None:
+            settings = load_settings(SETTINGS_PATH)
+            if settings["server_url"].strip().rstrip("/") == client.base_url:
+                voice_id = settings["voice_id"]
+        selected = voice_id if voice_id in voices else next(
+            (candidate for candidate in voices if candidate.casefold() == (voice_id or "").strip().casefold()),
+            None,
+        )
         loaded = "読込済み" if health.get("runtime_loaded") else "未読込"
-        return f"✅ 接続成功 — voices: {voice_count} / runtime: {loaded}"
+        status = f"✅ 接続成功 — voices: {len(voices)} / runtime: {loaded}"
+        if not voices:
+            status += "。サーバー側の voices フォルダーを確認してください。"
+        return status, gr.Dropdown(choices=voices, value=selected)
     except BuilderError as exc:
-        return f"❌ {exc}"
+        return f"❌ {exc}", gr.Dropdown(choices=[], value=None)
 
 
 def parse_steps(value: object) -> int:
@@ -1217,7 +1227,7 @@ def parse_steps(value: object) -> int:
 
 def run_generation(
     server_url: str,
-    voice_id: str,
+    voice_id: str | None,
     num_steps: object,
     *type_values: object,
     progress: gr.Progress = gr.Progress(track_tqdm=False),
@@ -1256,7 +1266,7 @@ def run_generation(
 def run_type_generation(
     voice_type: str,
     server_url: str,
-    voice_id: str,
+    voice_id: str | None,
     num_steps: object,
     text_value: str,
     caption_value: str,
@@ -1312,7 +1322,7 @@ def _remove_previous_sample(path_value: object) -> None:
 def run_sample_generation(
     voice_type: str,
     server_url: str,
-    voice_id: str,
+    voice_id: str | None,
     num_steps: object,
     text_value: str,
     caption_value: str,
@@ -1352,7 +1362,7 @@ def reset_sample_sequence(sample_state: dict[str, object] | None) -> dict[str, o
     return {"index": 0, "path": state.get("path", "")}
 
 
-def persist_inputs(server_url: str, voice_id: str, num_steps: object, *type_values: object) -> None:
+def persist_inputs(server_url: str, voice_id: str | None, num_steps: object, *type_values: object) -> None:
     try:
         steps = int(float(num_steps))
     except (TypeError, ValueError):
@@ -1368,8 +1378,10 @@ def persist_inputs(server_url: str, voice_id: str, num_steps: object, *type_valu
         }
     with SETTINGS_LOCK:
         settings = load_settings(SETTINGS_PATH)
+        new_url = str(server_url or "").strip().rstrip("/")
+        if voice_id is not None or settings["server_url"].strip().rstrip("/") != new_url:
+            settings["voice_id"] = str(voice_id or "")
         settings["server_url"] = str(server_url or "")
-        settings["voice_id"] = str(voice_id or "")
         settings["num_steps"] = steps
         settings["types"] = type_settings
         save_settings(SETTINGS_PATH, settings)
@@ -1737,10 +1749,11 @@ def build_ui() -> gr.Blocks:
             server_status = gr.Markdown("サーバーを起動してから接続確認してください。")
 
             with gr.Row():
-                voice_id = gr.Textbox(
+                voice_id = gr.Dropdown(
                     label="参照voice",
-                    value=str(saved["voice_id"]),
-                    placeholder="例: 森岡凛",
+                    choices=[],
+                    value=None,
+                    interactive=True,
                     scale=3,
                 )
                 num_steps = gr.Number(
@@ -1843,7 +1856,16 @@ def build_ui() -> gr.Blocks:
             generated_files = gr.File(label="生成ファイル", file_count="multiple")
             generated_voice_set = gr.State({})
 
-            check_button.click(check_server, inputs=server_url, outputs=server_status)
+            voice_list_inputs = [server_url, voice_id]
+            voice_list_outputs = [server_status, voice_id]
+            demo.load(check_server, inputs=voice_list_inputs, outputs=voice_list_outputs)
+            check_button.click(check_server, inputs=voice_list_inputs, outputs=voice_list_outputs)
+            server_url.input(
+                lambda: ("接続確認を押してボイス一覧を取得してください。", gr.Dropdown(choices=[], value=None)),
+                outputs=voice_list_outputs,
+                queue=False,
+                show_progress="hidden",
+            )
             bulk_generation_event = generate_button.click(
                 run_generation,
                 inputs=[server_url, voice_id, num_steps, *inputs],
@@ -1892,7 +1914,8 @@ def build_ui() -> gr.Blocks:
 
             persistent_inputs = [server_url, voice_id, num_steps, *inputs]
             for component in persistent_inputs:
-                component.change(
+                on_edit = component.input if component is voice_id else component.change
+                on_edit(
                     persist_inputs,
                     inputs=persistent_inputs,
                     outputs=None,

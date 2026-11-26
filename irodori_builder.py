@@ -182,17 +182,25 @@ class IrodoriServerClient:
     def health(self) -> dict[str, object]:
         return self._get_json("/health")
 
-    def ensure_voice(self, voice_id: str) -> str:
-        requested = voice_id.strip()
-        if not requested:
-            raise BuilderError("参照voiceを指定してください。")
+    def list_voice_ids(self) -> list[str]:
         payload = self._get_json("/voices")
         voices = payload.get("voices")
         if not isinstance(voices, list):
             raise BuilderError("TTSサーバーのvoice一覧を取得できませんでした。")
+        ids = []
         for entry in voices:
-            if isinstance(entry, dict) and str(entry.get("id", "")).casefold() == requested.casefold():
-                return str(entry["id"])
+            voice_id = entry.get("id") if isinstance(entry, dict) else None
+            if isinstance(voice_id, str) and voice_id.strip():
+                ids.append(voice_id)
+        return list(dict.fromkeys(ids))
+
+    def ensure_voice(self, voice_id: str | None) -> str:
+        requested = (voice_id or "").strip()
+        if not requested:
+            raise BuilderError("参照voiceを指定してください。")
+        for available_id in self.list_voice_ids():
+            if available_id.casefold() == requested.casefold():
+                return available_id
         raise BuilderError(f"参照voice「{requested}」がTTSサーバーに見つかりません。")
 
     def synthesize(
@@ -247,7 +255,7 @@ def generate_voice_set(
     *,
     client: IrodoriServerClient,
     output_root: Path,
-    voice_id: str,
+    voice_id: str | None,
     num_steps: int,
     groups: Iterable[GenerationGroup],
     progress: Callable[[int, int, str], None] | None = None,
@@ -294,7 +302,7 @@ def generate_sample_clip(
     *,
     client: IrodoriServerClient,
     sample_root: Path,
-    voice_id: str,
+    voice_id: str | None,
     voice_type: str,
     text_value: str,
     caption: str | None,

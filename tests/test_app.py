@@ -20,6 +20,7 @@ from app import (
     OPEN_GENERATION_TAB_JS,
     STATE_COLORS,
     emoji_palette_html,
+    check_server,
     state_class,
     run_type_generation,
     select_generated_voice,
@@ -27,6 +28,32 @@ from app import (
     split_filename_toggle_parts,
     persist_arrange_available_tags,
 )
+
+
+class ReferenceVoiceTests(unittest.TestCase):
+    def test_connection_lists_voices_and_restores_saved_selection(self) -> None:
+        url = "http://127.0.0.1:5000"
+        with (
+            patch("app.load_settings", return_value={"server_url": url, "voice_id": "voice b"}),
+            patch("app.IrodoriServerClient._get_json", side_effect=[
+                {"runtime_loaded": True},
+                {"voices": [{"id": "Voice A"}, {"id": "Voice B"}, {"id": "Voice B"}, {}]},
+            ]),
+        ):
+            status, dropdown = check_server(url, None)
+
+        self.assertIn("voices: 2", status)
+        self.assertEqual(dropdown.choices, [("Voice A", "Voice A"), ("Voice B", "Voice B")])
+        self.assertEqual(dropdown.value, "Voice B")
+
+    def test_refresh_does_not_select_a_replacement_for_a_removed_voice(self) -> None:
+        with patch("app.IrodoriServerClient._get_json", side_effect=[
+            {"runtime_loaded": True},
+            {"voices": [{"id": "Voice A"}]},
+        ]):
+            _, dropdown = check_server("http://127.0.0.1:5000", "Removed voice")
+
+        self.assertIsNone(dropdown.value)
 
 
 class ArrangeSelectionTests(unittest.TestCase):
